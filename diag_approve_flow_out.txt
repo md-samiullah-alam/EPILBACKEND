@@ -1,0 +1,19 @@
+=== GET /templates?approval=Pending ===
+STATUS=200
+BODY={"ok":true,"templates":[],"total":0}
+
+=== GET /templates?approval=Approved ===
+STATUS=200
+BODY={"ok":true,"templates":[],"total":0}
+
+=== GET /templates?approval=all ===
+STATUS=200
+BODY={"ok":true,"templates":[],"total":0}
+
+=== GET /templates/approved ===
+STATUS=200
+BODY={"ok":true,"templates":[],"total":0}
+
+=== GET /templates/departments ===
+STATUS=200
+BODY={"ok":true,"departments":["MIS"]}

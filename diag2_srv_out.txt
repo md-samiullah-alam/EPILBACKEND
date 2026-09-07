@@ -1,0 +1,23 @@
+[dotenv@17.3.1] injecting env (20) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🤖 agentic secret storage: https://dotenvx.com/as2
+🚀 Server running on port 5001
+📅 Checking if generation needed on startup...
+📅 ==================================
+📅 Auto-generate check at: 7/9/2026, 2:17:33 pm
+⏭️ This month already generated, skipping
+📅 ==================================
+⏰ Hourly check running...
+📅 ==================================
+📅 Auto-generate check at: 7/9/2026, 3:00:00 pm
+⏭️ This month already generated, skipping
+📅 ==================================
+⏰ Hourly check running...
+📅 ==================================
+📅 Auto-generate check at: 7/9/2026, 4:00:00 pm
+⏭️ This month already generated, skipping
+📅 ==================================
+⏰ Hourly check running...
+📅 ==================================
+📅 Auto-generate check at: 7/9/2026, 5:00:00 pm
+⏭️ This month already generated, skipping
+📅 ==================================

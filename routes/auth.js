@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const { nanoid } = require("nanoid");
 const jwt = require("jsonwebtoken");
-const { getSheets } = require("../googleSheetsClient");
+const { getSheets, withSheets } = require("../googleSheetsClient");
 const asyncHandler = require("../middleware/asyncHandler");
 const { formatDateDMY, parseDateFromDMY } = require("../utils/dateHelpers");
 const { parser } = require("../cloudinary");
@@ -179,10 +179,12 @@ router.post("/login", asyncHandler(async (req, res) => {
     return res.status(400).json({ error: "EmployeeID and password required" });
   }
 
-  const sheets = await getSheets();
-  const empRes = await sheets.spreadsheets.values.get({
-    spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Employee!A:BW",
+  // Use withSheets for automatic retry on auth errors
+  const empRes = await withSheets(async (sheets) => {
+    return await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: "Employee!A:BW",
+    });
   });
 
   const employees = empRes.data.values || [];

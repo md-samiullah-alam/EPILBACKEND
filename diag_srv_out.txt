@@ -1,0 +1,23 @@
+[dotenv@17.3.1] injecting env (21) from .env -- tip: ⚙️  suppress all logs with { quiet: true }
+[dotenv@17.3.1] injecting env (0) from .env -- tip: 🔐 encrypt with Dotenvx: https://dotenvx.com
+🚀 Server running on port 5000
+📅 Checking if generation needed on startup...
+📅 ==================================
+📅 Auto-generate check at: 7/9/2026, 2:11:24 pm
+⏭️ This month already generated, skipping
+📅 ==================================
+⏰ Hourly check running...
+📅 ==================================
+📅 Auto-generate check at: 7/9/2026, 3:00:00 pm
+⏭️ This month already generated, skipping
+📅 ==================================
+⏰ Hourly check running...
+📅 ==================================
+📅 Auto-generate check at: 7/9/2026, 4:00:00 pm
+⏭️ This month already generated, skipping
+📅 ==================================
+⏰ Hourly check running...
+📅 ==================================
+📅 Auto-generate check at: 7/9/2026, 5:00:00 pm
+⏭️ This month already generated, skipping
+📅 ==================================

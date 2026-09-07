@@ -3,7 +3,7 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const { nanoid } = require("nanoid");
 const jwt = require("jsonwebtoken");
-const { getSheets } = require("../googleSheetsClient");
+const { getSheets, withSheets } = require("../googleSheetsClient");
 
 // =====================================================
 // REGISTER
@@ -16,14 +16,12 @@ router.post("/Admin/register", async (req, res) => {
       return res.status(400).json({ error: "All fields required" });
     }
 
-    const sheets = await getSheets();
-
-    // -------------------------------------------------
-    // CHECK EXISTING MOBILE
-    // -------------------------------------------------
-    const empRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "Admin!A2:F",
+    // Use withSheets for automatic retry on auth errors
+    const empRes = await withSheets(async (sheets) => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range: "Admin!A2:F",
+      });
     });
 
     const employees = empRes.data.values || [];
@@ -45,10 +43,12 @@ router.post("/Admin/login", async (req, res) => {
   try {
     const { employeeID, password } = req.body;
 
-    const sheets = await getSheets();
-    const empRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: process.env.GOOGLE_SHEET_ID,
-      range: "Admin!A:F",
+    // Use withSheets for automatic retry on auth errors
+    const empRes = await withSheets(async (sheets) => {
+      return await sheets.spreadsheets.values.get({
+        spreadsheetId: process.env.GOOGLE_SHEET_ID,
+        range: "Admin!A:F",
+      });
     });
 
     const employees = empRes.data.values || [];
