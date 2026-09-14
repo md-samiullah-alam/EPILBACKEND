@@ -6,33 +6,50 @@ const jwt = require("jsonwebtoken");
 const { getSheets, withSheets } = require("../googleSheetsClient");
 const asyncHandler = require("../middleware/asyncHandler");
 const { formatDateDMY, parseDateFromDMY } = require("../utils/dateHelpers");
-const { parser } = require("../cloudinary");
+const { parser, handleUpload, uploadBufferToCloudinary } = require("../cloudinary");
 
 // =====================================================
 // REGISTER - EXACT SAME PATTERN AS SUPPORT TICKETS
 // =====================================================
-router.post("/register", parser.fields([
+router.post("/register", handleUpload(parser.fields([
   { name: "profilePicture", maxCount: 1 },
   { name: "aadhaarCard", maxCount: 1 },
   { name: "panCard", maxCount: 1 },
   { name: "bankPassbook", maxCount: 1 },
   { name: "educationCert", maxCount: 1 },
   { name: "experienceCert", maxCount: 1 }
-]), asyncHandler(async (req, res) => {
+])), asyncHandler(async (req, res) => {
   const data = req.body;
   const files = req.files || {};
   
   console.log("========== REGISTER API ==========");
   console.log("Data keys:", Object.keys(data));
   console.log("Files keys:", Object.keys(files));
-  
-  // Get Cloudinary URLs - EXACT SAME as supportTickets
-  const profilePictureUrl = files.profilePicture ? files.profilePicture[0].path : "";
-  const aadhaarCardUrl = files.aadhaarCard ? files.aadhaarCard[0].path : "";
-  const panCardUrl = files.panCard ? files.panCard[0].path : "";
-  const bankPassbookUrl = files.bankPassbook ? files.bankPassbook[0].path : "";
-  const educationCertUrl = files.educationCert ? files.educationCert[0].path : "";
-  const experienceCertUrl = files.experienceCert ? files.experienceCert[0].path : "";
+
+  // Memory-storage buffers ko Cloudinary par upload karo (clean JSON error on fail)
+  async function fileUrl(field) {
+    const f = files[field]?.[0];
+    if (!f || !f.buffer || !f.buffer.length) return "";
+    try {
+      const up = await uploadBufferToCloudinary(f.buffer, { public_id: `${field}_${Date.now()}` });
+      return up.secure_url || up.url || "";
+    } catch (e) {
+      console.error(`[Register] ${field} upload failed:`, e.message);
+      throw new Error(`${field} image upload failed: ${e.message}`);
+    }
+  }
+
+  let profilePictureUrl = "", aadhaarCardUrl = "", panCardUrl = "";
+  let bankPassbookUrl = "", educationCertUrl = "", experienceCertUrl = "";
+  try {
+    [profilePictureUrl, aadhaarCardUrl, panCardUrl, bankPassbookUrl, educationCertUrl, experienceCertUrl] =
+      await Promise.all([
+        fileUrl("profilePicture"), fileUrl("aadhaarCard"), fileUrl("panCard"),
+        fileUrl("bankPassbook"), fileUrl("educationCert"), fileUrl("experienceCert"),
+      ]);
+  } catch (upErr) {
+    return res.status(502).json({ error: upErr.message, hint: "2MB se chhoti JPG/PNG try karo." });
+  }
   
   // Validation - only 4 fields required
   if (!data.name) return res.status(400).json({ error: "Name required" });

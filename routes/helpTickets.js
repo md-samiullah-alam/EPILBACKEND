@@ -3,7 +3,7 @@ const { nanoid } = require("nanoid");
 const { getSheets } = require("../googleSheetsClient");
 const auth = require("../middleware/auth");
 const asyncHandler = require("../middleware/asyncHandler");
-const { parser } = require("../cloudinary");
+const { parser, handleUpload, uploadBufferToCloudinary } = require("../cloudinary");
 const { formatDateIST, parseDDMMYYYY, getWeekRange } = require("../utils/dateHelpers");
 const { getCache, setCache, invalidateCache } = require("../utils/sheetCache");
 
@@ -45,10 +45,33 @@ function mapHelpTicket(r) {
 // ======================================================
 // CREATE TICKET
 // ======================================================
-router.post("/create", auth, parser.single("IssuePhoto"), asyncHandler(async (req, res) => {
+router.post("/create", auth, handleUpload(parser.single("IssuePhoto")), asyncHandler(async (req, res) => {
   const { AssignedTo, Issue } = req.body;
   if (!AssignedTo || !Issue) return res.status(400).json({ error: "AssignedTo and Issue required" });
   if (AssignedTo === req.user.name) return res.status(400).json({ error: "Cannot assign ticket to yourself" });
+
+  // 1) Image (agar hai) ko pehle Cloudinary par upload karo (memory buffer +
+  // 25s timeout taaki Render proxy hang hokar 502 na de).
+  let photoUrl = "";
+  if (req.file && req.file.buffer && req.file.buffer.length) {
+    try {
+      console.log(`[HelpTicket] Uploading image: ${req.file.originalname} (${req.file.size} bytes, ${req.file.mimetype})`);
+      const up = await uploadBufferToCloudinary(req.file.buffer, {
+        public_id: `help_${Date.now()}`,
+      });
+      photoUrl = up.secure_url || up.url || "";
+      console.log("[HelpTicket] Image uploaded:", photoUrl);
+    } catch (upErr) {
+      console.error("[HelpTicket] Cloudinary upload failed:", upErr.message);
+      return res.status(502).json({
+        error: "Image upload failed: " + (upErr.message || "Cloudinary error"),
+        hint: "2MB se chhoti JPG/PNG try karo, ya bina image ke ticket banao.",
+      });
+    }
+  } else if (req.file && !req.file.buffer) {
+    console.error("[HelpTicket] File received without buffer:", req.file.originalname);
+    return res.status(400).json({ error: "Image read nahi ho payi. Dobara select karke retry karo." });
+  }
 
   const sheets = await getSheets();
   const spreadsheetId = process.env.GOOGLE_SHEET_ID_HELPTICKET;
@@ -69,7 +92,6 @@ router.post("/create", auth, parser.single("IssuePhoto"), asyncHandler(async (re
 
   const ticketID = `#${String(maxNumber + 1).padStart(5, '0')}`;
   const createdDate = formatDateIST();
-  const photoUrl = req.file ? req.file.path : "";
 
   await sheets.spreadsheets.values.append({
     spreadsheetId, range: `${SHEET_NAME}!A:H`,

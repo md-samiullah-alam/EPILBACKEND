@@ -2,7 +2,7 @@ const express = require("express");
 const { getSheets } = require("../googleSheetsClient");
 const auth = require("../middleware/auth");
 const asyncHandler = require("../middleware/asyncHandler");
-const { parser } = require("../cloudinary");
+const { parser, handleUpload, uploadBufferToCloudinary } = require("../cloudinary");
 const { formatDateIST, parseDDMMYYYY, getWeekRange } = require("../utils/dateHelpers");
 const { getCache, setCache, invalidateCache } = require("../utils/sheetCache");
 
@@ -70,13 +70,36 @@ router.get("/test-auth", auth, (req, res) => {
 // ======================================================
 // CREATE TICKET
 // ======================================================
-router.post("/create", auth, parser.single("IssuePhoto"), asyncHandler(async (req, res) => {
+router.post("/create", auth, handleUpload(parser.single("IssuePhoto")), asyncHandler(async (req, res) => {
   const { Issue } = req.body;
   if (!Issue) return res.status(400).json({ error: "Issue description is required" });
 
+  // 1) Image (agar hai) ko pehle Cloudinary par upload karo.
+  // Memory storage hai, isliye yaha buffer milta hai - 25s timeout ke sath,
+  // taaki Render proxy hang hokar 502 na de. Koi bhi failure clean JSON dega.
+  let photoUrl = "";
+  if (req.file && req.file.buffer && req.file.buffer.length) {
+    try {
+      console.log(`[SupportTicket] Uploading image: ${req.file.originalname} (${req.file.size} bytes, ${req.file.mimetype})`);
+      const up = await uploadBufferToCloudinary(req.file.buffer, {
+        public_id: `support_${Date.now()}`,
+      });
+      photoUrl = up.secure_url || up.url || "";
+      console.log("[SupportTicket] Image uploaded:", photoUrl);
+    } catch (upErr) {
+      console.error("[SupportTicket] Cloudinary upload failed:", upErr.message);
+      return res.status(502).json({
+        error: "Image upload failed: " + (upErr.message || "Cloudinary error"),
+        hint: "2MB se chhoti JPG/PNG try karo, ya bina image ke ticket banao.",
+      });
+    }
+  } else if (req.file && !req.file.buffer) {
+    console.error("[SupportTicket] File received without buffer:", req.file.originalname);
+    return res.status(400).json({ error: "Image read nahi ho payi. Dobara select karke retry karo." });
+  }
+
   const sheets = await getSheets();
   const createdDate = formatDateIST();
-  const photoUrl = req.file ? req.file.path : "";
 
   // Get employees data including department
   const empRes = await sheets.spreadsheets.values.get({
