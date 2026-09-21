@@ -1,0 +1,13 @@
+[dotenv@17.3.1] injecting env (21) from .env -- tip: 🔐 prevent committing .env to code: https://dotenvx.com/precommit
+[dotenv@17.3.1] injecting env (0) from .env -- tip: ⚙️  load multiple .env files with { path: ['.env.local', '.env'] }
+🚀 Server running on port 5000
+📅 Checking if generation needed on startup...
+📅 ==================================
+📅 Auto-generate check at: 21/9/2026, 2:18:29 pm
+⏭️ This month already generated, skipping
+📅 ==================================
+⏰ Hourly check running...
+📅 ==================================
+📅 Auto-generate check at: 21/9/2026, 3:00:00 pm
+⏭️ This month already generated, skipping
+📅 ==================================

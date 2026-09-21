@@ -1,0 +1,28 @@
+=== employee designations ===
+STATUS=200
+DESIG_LIST=["COMMON","Account asistant","Account data man","Account junior asistant","Billing & stock Menegment","Boiler","Boiler person","Civil Project","Contain Cretor","Content Creator .","CRM ALL","CRM DATA  ENTRY"]
+SAMPLE_DESIG=Account asistant
+=== templates (no filter) ===
+STATUS=200
+COUNT=2 DESIGS=["CRM ALL","COMMON"]
+TemplateDesignation field present=["CRM ALL","COMMON"]
+=== templates?designation=Account asistant ===
+STATUS=200
+COUNT=0 DESIGS=[]
+=== templates?department=Account asistant (purana alias) ===
+STATUS=200
+COUNT=0 DESIGS=[]
+=== templates?designation=__NO_SUCH__ (0 hona chahiye) ===
+STATUS=200
+COUNT=0 DESIGS=[]
+=== approved?designation=Account asistant ===
+STATUS=200
+COUNT=0 DESIGS=[]
+=== records?employeeName=all&scope=all&status=all ===
+STATUS=200
+RECORD_ROWS=0
+SAMPLE_KEYS=[]
+DESIG_MISMATCH_ROWS=0 (0 hona chahiye)
+=== records?scope=Account asistant ===
+STATUS=200
+SCOPED_ROWS=0

@@ -1,0 +1,10 @@
+=== templates?approval=all === OK
+ALL_TEMPLATES=[{"id":"TMP-XHGLA5JP","desig":"CRM ALL","name":"Testing training","approval":"Pending"},{"id":"TMP-WX_U5XOF","desig":"COMMON","name":"Checklist deligation understand","approval":"Pending"}]
+=== templates?approval=Approved === OK
+APPROVED_COUNT=0
+=== employee/all === OK
+EMPLOYEE_COUNT=78
+EMP_SAMPLE=[{"name":"Abhishek Rajput","department":"BOILER","designation":"Boiler"},{"name":"Ajay Yadav","department":"SECURITY","designation":"Security"},{"name":"Aman Thakur","department":"RM","designation":"House keeping& Rm Assistant"},{"name":"Amit Dubey","department":"DISPATCH","designation":"Junior Dispetch Person"},{"name":"Ankit 's Driver","department":"DRIVER","designation":"Driver"},{"name":"Ankit Gupta","department":"RM","designation":"HOD RM Department"}]
+EMP_DESIGS=["Boiler","Security","House keeping& Rm Assistant","Junior Dispetch Person","Driver","HOD RM Department","Flore men","PC","RM Asiatant","Boiler person","CRM ALL","Billing & stock Menegment","SC ALL","Inport  Export data entry","HOD Account Department","Trainer","MIS","OC Head","Dispetch HOD","Account data man","HOD ENGG","SC CRR DATA  ENTRY","Recruter","Store person","Utility HOD","Store Keepar","HR Head","Content Creator .","Electrical man","PROJECT","RO","HOD Purchase & Store","project store","Account junior asistant","Instrument","MD","Safty & comp. head","EA","RM Incharg","Inport  Export data man","Project Co-ordintor","Account asistant","Godown Incharg","SOMaker","ECR+ Store Electrical","Civil Project","Inport  Export HOD","HOD Eletrical","Utility Person","Store purcheser cc","Production engg & Costt","CRM DATA  ENTRY","Inport  Export junior asistant","Pulp Head","Contain Cretor"]
+=== training/my (admin token se) === OK
+MY_ROWS=0

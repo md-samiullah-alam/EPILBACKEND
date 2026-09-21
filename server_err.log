@@ -1,0 +1,2 @@
+[2026-09-21T08:50:02.046Z] GET /api/support-tickets/all: request to https://sheets.googleapis.com/v4/spreadsheets/18S5_PSk6TWcrvOVfIZ1F_UCSK41MO6955Gl5eRpJNMU/values/SupportTicketsMaster%21A2%3AZ failed, reason: Client network socket disconnected before secure TLS connection was established
+[2026-09-21T08:50:02.072Z] GET /api/helpTickets/all: request to https://sheets.googleapis.com/v4/spreadsheets/1a64ifOCEb6GE9c8BWH00xexpHHpaJuhuzKezcWzBHNw/values/HelpTicketsMaster%21A2%3AH failed, reason: Client network socket disconnected before secure TLS connection was established

@@ -1,0 +1,48 @@
+BASE=http://localhost:5000/api
+ENV JWT_SECRET set = true
+=== GET /employee/designations ===
+URL=http://localhost:5000/api/employee/designations
+HTTP_ERROR=connect ECONNREFUSED ::1:5000; connect ECONNREFUSED 127.0.0.1:5000
+DESIGNATIONS=[]
+
+=== GET /training/templates?approval=all ===
+URL=http://localhost:5000/api/training/templates?approval=all
+HTTP_ERROR=connect ECONNREFUSED ::1:5000; connect ECONNREFUSED 127.0.0.1:5000
+TEMPLATE_DESIGS=[]
+
+=== GET /training/templates/approved?designation=__NO_SUCH_DESIG__ ===
+URL=http://localhost:5000/api/training/templates/approved?designation=__NO_SUCH_DESIG__
+HTTP_ERROR=connect ECONNREFUSED ::1:5000; connect ECONNREFUSED 127.0.0.1:5000
+GHOST_NON_COMMON=0 (0 hona chahiye)
+
+=== GET /training/records?employeeName=all&scope=all&status=all ===
+URL=http://localhost:5000/api/training/records?employeeName=all&scope=all&status=all
+HTTP_ERROR=connect ECONNREFUSED ::1:5000; connect ECONNREFUSED 127.0.0.1:5000
+RECORD_ROWS=0
+SAMPLE_ROW={}
+DESIG_MISMATCH_ROWS=0 (0 hona chahiye)
+
+=== PROBE designation=CRM ALL ===
+URL=http://localhost:5000/api/training/templates?designation=CRM%20ALL
+HTTP_ERROR=connect ECONNREFUSED ::1:5000; connect ECONNREFUSED 127.0.0.1:5000
+COUNT=0 DESIGS=[]
+
+=== PROBE department=CRM ALL ===
+URL=http://localhost:5000/api/training/templates?department=CRM%20ALL
+HTTP_ERROR=connect ECONNREFUSED ::1:5000; connect ECONNREFUSED 127.0.0.1:5000
+COUNT=0 DESIGS=[]
+
+=== PROBE approval=Approved ===
+URL=http://localhost:5000/api/training/templates?approval=Approved
+HTTP_ERROR=connect ECONNREFUSED ::1:5000; connect ECONNREFUSED 127.0.0.1:5000
+COUNT=0 DESIGS=[]
+
+=== PROBE approval=all ===
+URL=http://localhost:5000/api/training/templates?approval=all
+HTTP_ERROR=connect ECONNREFUSED ::1:5000; connect ECONNREFUSED 127.0.0.1:5000
+COUNT=0 DESIGS=[]
+
+=== GET /training/templates/departments ===
+URL=http://localhost:5000/api/training/templates/departments
+HTTP_ERROR=connect ECONNREFUSED ::1:5000; connect ECONNREFUSED 127.0.0.1:5000
+TEMPLATE_SHEET_DESIGS=[]

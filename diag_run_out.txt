@@ -1,0 +1,2 @@
+[dotenv@17.3.1] injecting env (21) from .env -- tip: 🛡️ auth for agents: https://vestauth.com
+DIAG DESIG MATCH DONE tag=5000

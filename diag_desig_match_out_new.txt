@@ -1,0 +1,64 @@
+BASE=http://localhost:5001/api
+ENV JWT_SECRET set = true
+=== GET /employee/designations ===
+URL=http://localhost:5001/api/employee/designations
+STATUS=200
+DESIGNATIONS=["COMMON","Account asistant","Account data man","Account junior asistant","Billing & stock Menegment","Boiler","Boiler person","Civil Project","Contain Cretor","Content Creator .","CRM ALL","CRM DATA  ENTRY","Dispetch HOD","Driver","EA","ECR+ Store Electrical","Electrical man","Flore men","Godown Incharg","HOD Account Department","HOD Eletrical","HOD ENGG","HOD Purchase & Store","HOD RM Department","House keeping& Rm Assistant","HR Head","Inport  Export data entry","Inport  Export data man","Inport  Export HOD","Inport  Export junior asistant","Instrument","Junior Dispetch Person","MD","MIS","OC Head","PC","Production engg & Costt","PROJECT","Project Co-ordintor","project store","Pulp Head","Recruter","RM Asiatant","RM Incharg","RO","Safty & comp. head","SC ALL","SC CRR DATA  ENTRY","Security","SOMaker","Store Keepar","Store person","Store purcheser cc","Trainer","Utility HOD","Utility Person"]
+
+=== GET /training/templates?approval=all ===
+URL=http://localhost:5001/api/training/templates?approval=all
+STATUS=200
+TEMPLATE_DESIGS=["CRM ALL","COMMON"]
+
+=== GET /training/templates?designation=Account asistant ===
+URL=http://localhost:5001/api/training/templates?designation=Account%20asistant
+STATUS=200
+FILTERED_COUNT=0 MISMATCH=0
+
+=== GET /training/templates/approved?designation=Account asistant ===
+URL=http://localhost:5001/api/training/templates/approved?designation=Account%20asistant
+STATUS=200
+APPROVED_FOR_DESIG=[]
+NON_MATCHING_LEAKED=0
+
+=== GET /training/templates/approved?designation=__NO_SUCH_DESIG__ ===
+URL=http://localhost:5001/api/training/templates/approved?designation=__NO_SUCH_DESIG__
+STATUS=200
+GHOST_NON_COMMON=0 (0 hona chahiye)
+
+=== GET /training/records?employeeName=all&scope=all&status=all ===
+URL=http://localhost:5001/api/training/records?employeeName=all&scope=all&status=all
+STATUS=200
+RECORD_ROWS=0
+SAMPLE_ROW={}
+DESIG_MISMATCH_ROWS=0 (0 hona chahiye)
+
+=== GET /training/records?scope=Account asistant ===
+URL=http://localhost:5001/api/training/records?employeeName=all&scope=Account%20asistant&status=all
+STATUS=200
+SCOPED_ROWS=0 OUT_OF_SCOPE=0 (0 hona chahiye)
+
+=== PROBE designation=CRM ALL ===
+URL=http://localhost:5001/api/training/templates?designation=CRM%20ALL
+STATUS=200
+COUNT=1 DESIGS=["CRM ALL"]
+
+=== PROBE department=CRM ALL ===
+URL=http://localhost:5001/api/training/templates?department=CRM%20ALL
+STATUS=200
+COUNT=1 DESIGS=["CRM ALL"]
+
+=== PROBE approval=Approved ===
+URL=http://localhost:5001/api/training/templates?approval=Approved
+STATUS=200
+COUNT=0 DESIGS=[]
+
+=== PROBE approval=all ===
+URL=http://localhost:5001/api/training/templates?approval=all
+STATUS=200
+COUNT=2 DESIGS=["CRM ALL","COMMON"]
+
+=== GET /training/templates/departments ===
+URL=http://localhost:5001/api/training/templates/departments
+STATUS=200
+TEMPLATE_SHEET_DESIGS=["COMMON","CRM ALL"]

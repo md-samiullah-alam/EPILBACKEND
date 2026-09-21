@@ -1,0 +1,16 @@
+EMPLOYEES=78 CRM_ALL_EMPS=2
+TEMPLATE=TMP-XHGLA5JP | CRM ALL | Pending
+APPROVE={"ok":true,"message":"Template Approved"}
+PASS doer-approved-list CRM ALL ko template dikhe :: templates=1
+PASS doer-approved-list MIS ko LEAK nahi :: ids=-
+PASS /my MIS employee ko LEAK nahi :: rows=0
+PASS /my CRM ALL employee ko assigned dikhe :: Type=Designation Status=Pending TplDesig=CRM ALL
+PASS /my summary designation bucket>0 :: {"assigned":1,"started":0,"completed":0,"inProgress":0,"pending":1,"totalMax":300,"totalEarned":0}
+PASS admin /records scope=CRM ALL rows>0 :: rows=2
+PASS admin /records rows sab CRM ALL designation ke :: mismatch=0
+PASS admin /records me CRM ALL employee ki row :: Status=Pending Started=false
+PASS admin /records employeeName filter :: rows=1
+REVERT={"ok":true,"message":"Template Moved to Pending"}
+PASS revert → template Pending wapas :: Approval=Pending
+
+SUMMARY PASS=10 FAIL=0

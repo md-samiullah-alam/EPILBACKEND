@@ -213,7 +213,7 @@ router.post("/login", asyncHandler(async (req, res) => {
   if (!passOK) return res.status(401).json({ error: "Incorrect password" });
 
   const token = jwt.sign(
-    { employeeID: user[0], name: user[1], department: user[4] },
+    { employeeID: user[0], name: user[1], department: user[4], designation: user[10] || "" },
     process.env.JWT_SECRET,
     { expiresIn: "2d" }
   );
@@ -225,12 +225,12 @@ router.post("/login", asyncHandler(async (req, res) => {
       employeeID: user[0],
       name: user[1],
       department: user[4],
+      designation: user[10] || "",
       mobile: user[2],
       companyName: user[6] || "",
       dateOfBirth: parseDateFromDMY(user[7]),
       joiningDate: parseDateFromDMY(user[8]),
       profilePicture: user[9] || "",
-      designation: user[10] || "",
       donorName: user[11] || "",
       sheet: `${user[1]}_Delegations`,
     },

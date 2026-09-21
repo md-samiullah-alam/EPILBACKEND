@@ -9,18 +9,19 @@ const router = express.Router();
 // ============================================================
 // TRAINING MODULE - GOOGLE SHEETS DATABASE
 // Sheet 1: MasterTemplateData (A-H)
-//   A Template ID | B Department | C Template Name/Index Name
+//   A Template ID | B Designation (column B — purana naam Department) | C Template Name/Index Name
 //   D Template Document | E Template Video | F Template Score
 //   G Template Approval | H Training Name (course name - auto)
 // Sheet 2: AQData (A-H)
 //   A Template ID | B QA ID | C Question Name | D Option A
 //   E Option B | F Option C | G Option D | H Correct Option
 // Sheet 3: EmployeeTrainingData (A-P)
-//   A Employee Name | B Depatment | C Template Name | D Template ID
+//   A Employee Name | B Designation (column B — purana naam Depatment) | C Template Name | D Template ID
 //   E Document Score | F Video Score | G QA Score | H Total Score
 //   I Training Status Template | J Trainig Start Date | K Training End Date
 //   L Last Update | M Tools Documents | N Tools translite | O Tools summary
 //   P Progress Data (JSON - auto)
+// *** MATCHING: Common + employee DESIGNATION (department se nahi) ***
 // ============================================================
 
 const MT_SHEET = "MasterTemplateData";
@@ -52,18 +53,24 @@ const parseNum = (v) => {
   return isNaN(n) ? 0 : n;
 };
 
-// Dept helpers (case-insensitive, trimmed)
-const normDept = (d) => String(d || "").trim().toUpperCase();
-const isCommonDept = (d) => normDept(d) === "COMMON" || normDept(d) === "COMMON ";
-const sameDept = (a, b) => normDept(a) === normDept(b);
+// Dept/Designation helpers (case-insensitive, trimmed)
+// *** Training matching DESIGNATION-wise hai — sameDesig designation compare karta hai ***
+const normDesig = (d) => String(d || "").trim().toUpperCase();
+const isCommonDesig = (d) => normDesig(d) === "COMMON" || normDesig(d) === "COMMON ";
+const sameDesig = (a, b) => normDesig(a) === normDesig(b);
+// purane naam (compat aliases)
+const normDept = normDesig;
+const isCommonDept = isCommonDesig;
+const sameDept = sameDesig;
+const sameDesignation = sameDesig;
 
-// 3-times SELF + 2-times WITH-DOER view protection:
+// 2-times SELF + 2-times WITH-DOER view protection:
 // progress.views = { doc: {1:{self:0,withDoer:0,lastAt:0}}, video: {...} }
-// Har view ke baad 15-min cooldown: next view tabhi jab last view se 15+ min ho gaye hon.
-const REQUIRED_SELF_VIEWS = 3;
+// *** COOLDOWN HATA DIYA (user request): har view INSTANT count hota hai — koi 2-min wait nahi. ***
+// lastAt ab sirf audit/info ke liye save hota hai.
+const REQUIRED_SELF_VIEWS = 2;
 const REQUIRED_WITHDOER_VIEWS = 2;
-const REQUIRED_VIEWS = REQUIRED_SELF_VIEWS + REQUIRED_WITHDOER_VIEWS; // 5
-const VIEW_COOLDOWN_MS = 15 * 60 * 1000; // 15 minutes
+const REQUIRED_VIEWS = REQUIRED_SELF_VIEWS + REQUIRED_WITHDOER_VIEWS; // 4
 function blankViewSlot() { return { self: 0, withDoer: 0, lastAt: 0 }; }
 function getViews(progress) {
   if (!progress.views || typeof progress.views !== "object") progress.views = { doc: {}, video: {} };
@@ -76,8 +83,8 @@ function getViewSlot(progress, kind, index) {
   const k = kind === "doc" ? "doc" : "video";
   const key = String(index);
   const cur = views[k][key];
-  // purana number format (e.g. 5) migrate karo → self/doer me split:
-  // total>=5 → complete (3+2); 3-4 → self full + baaki doer; <3 → sab self
+  // purana format migrate karo → self/doer me split:
+  // total>=4 → complete (2+2); 2-3 → self full + baaki doer; <2 → sab self
   if (typeof cur === "number") {
     const total = parseNum(cur);
     const self = Math.min(REQUIRED_SELF_VIEWS, total);
@@ -99,18 +106,6 @@ const viewCount = (progress, kind, index) => {
 const viewsComplete = (progress, kind, index) => {
   const c = viewCount(progress, kind, index);
   return c.self >= REQUIRED_SELF_VIEWS && c.withDoer >= REQUIRED_WITHDOER_VIEWS;
-};
-const cooldownLeftMs = (progress, kind, index, nowMs) => {
-  const c = viewCount(progress, kind, index);
-  if (!c.lastAt) return 0;
-  const left = c.lastAt + VIEW_COOLDOWN_MS - nowMs;
-  return left > 0 ? left : 0;
-};
-const fmtCooldown = (ms) => {
-  const s = Math.ceil(ms / 1000);
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return m > 0 ? `${m}m ${r}s` : `${r}s`;
 };
 
 // Auto add helper columns if missing (Training Name in H1, Progress Data in P1)
@@ -163,12 +158,13 @@ async function readTrainingRows() {
 }
 
 // ============================================================
-// MAPPERS
+// MAPPERS — Column B = Designation (purana naam Department; code me Designation + Department dono alias)
 // ============================================================
 function mapTemplateRow(r) {
   return {
     TemplateId: r[0] || "",
-    Department: r[1] || "",
+    Department: r[1] || "", // purana key (compat) = Designation value
+    Designation: r[1] || "", // naya key
     IndexName: r[2] || "",
     Document: r[3] || "",
     Video: r[4] || "",
@@ -197,7 +193,8 @@ function mapTrainingRow(r) {
   if (!progress) progress = {};
   return {
     EmployeeName: r[0] || "",
-    Department: r[1] || "",
+    Department: r[1] || "", // purana key (compat) = Designation value
+    Designation: r[1] || "", // naya key
     TemplateName: r[2] || "",
     TemplateId: r[3] || "",
     DocumentScore: parseNum(r[4]),
@@ -226,7 +223,8 @@ function groupTemplates(rows) {
     if (!map.has(r.TemplateId)) {
       map.set(r.TemplateId, {
         TemplateId: r.TemplateId,
-        Department: r.Department,
+        Department: r.Department, // compat = Designation value
+        Designation: r.Designation || r.Department,
         TemplateName: r.TrainingName || r.IndexName,
         TemplateScore: r.Score,
         Approval: r.Approval || "Pending",
@@ -235,7 +233,7 @@ function groupTemplates(rows) {
     }
     const g = map.get(r.TemplateId);
     g.indices.push({ IndexName: r.IndexName, Document: r.Document, Video: r.Video });
-    if (r.Department) g.Department = r.Department;
+    if (r.Department) { g.Department = r.Department; g.Designation = r.Department; }
     if (r.Score && !g.TemplateScore) g.TemplateScore = r.Score;
   }
   return Array.from(map.values());
@@ -249,24 +247,80 @@ function filterExistingIndexes(list, totalIndices) {
 
 // ============================================================
 // ASSIGNED-LEARNING CORE — source of truth = TEMPLATES
-// Har employee ko assigned = ALL approved COMMON templates + uske dept ke approved templates.
+// Har employee ko assigned = ALL approved COMMON templates + uski DESIGNATION ke approved templates.
+// *** MATCH SIRF DESIGNATION SE HOTA HAI (department se nahi) ***
 // Status per (employee × template): record nahi mila → "Pending" (not started).
 // Yahi se assigned count, pending/inProgress/completed aur total score nikalta hai.
 // ============================================================
+// NOTE: readEmployeeMaster Employee sheet ka header padh kar Department +
+// Designation dono nikalta hai (K column safe — header shift hone par bhi).
+// Assignment me sirf emp.designation use hoti hai.
+const normHdr = (h) => String(h || "").trim().toLowerCase().replace(/[^a-z]/g, "");
+let empMasterColCache = null;
+async function getEmpMasterColMap() {
+  if (empMasterColCache) return empMasterColCache;
+  try {
+    const sheets = await getSheets();
+    const hRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: process.env.GOOGLE_SHEET_ID,
+      range: "Employee!A1:BZ1",
+    });
+    const header = (hRes.data.values || [])[0] || [];
+    const normed = header.map(normHdr);
+    const findIdx = (names) => {
+      for (const n of names) {
+        const i = normed.indexOf(normHdr(n));
+        if (i !== -1) return i;
+      }
+      return -1;
+    };
+    const dept = findIdx(["department", "dept", "depatment", "departmentname"]);
+    const desig = findIdx(["designation", "designations", "desig", "designition", "desgination", "post", "role", "title", "jobtitle", "position"]);
+    empMasterColCache = { dept: dept !== -1 ? dept : 4, desig: desig !== -1 ? desig : 10 };
+  } catch (e) {
+    empMasterColCache = { dept: 4, desig: 10 };
+  }
+  return empMasterColCache;
+}
 async function readEmployeeMaster() {
   const sheets = await getSheets();
+  const colMap = await getEmpMasterColMap();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SHEET_ID,
-    range: "Employee!A2:E",
+    range: "Employee!A2:BZ",
   });
   return (res.data.values || [])
     .filter((e) => e && e[1])
-    .map((e) => ({ employeeID: e[0] || "", name: e[1] || "", department: e[4] || "" }));
+    .map((e) => {
+      const cell = (i) => String(e[i] ?? "").trim();
+      const dept = cell(colMap.dept) || cell(4);
+      let desig = cell(colMap.desig) || cell(10);
+      if (!desig) {
+        // K blank ho to poori row se designation jaisa text fallback
+        for (const i of [10, 11, 12, 5, 6, 13, 14, 15, 16, 4, 3, 7]) {
+          if (i === colMap.desig) continue;
+          const v = cell(i);
+          if (!v || /^\d{5,}$/.test(v.replace(/[\s+\-]/g, "")) || v.length > 60) continue;
+          if (/^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(v)) continue;
+          if (/^https?:\/\//i.test(v)) continue;
+          desig = v; break;
+        }
+      }
+      return {
+        employeeID: e[0] || "",
+        name: e[1] || "",
+        department: dept,
+        designation: desig,
+      };
+    });
 }
 
-const assignedTemplatesFor = (approved, empDept) => [
-  ...approved.filter((t) => isCommonDept(t.Department)),
-  ...approved.filter((t) => !isCommonDept(t.Department) && sameDept(t.Department, empDept)),
+// *** DESIGNATION-ONLY match: template ki designation == employee ki designation ***
+const matchesEmpDesig = (templateDesig, emp) =>
+  sameDesig(templateDesig, emp.designation);
+const assignedTemplatesFor = (approved, emp) => [
+  ...approved.filter((t) => isCommonDesig(t.Designation ?? t.Department)),
+  ...approved.filter((t) => !isCommonDesig(t.Designation ?? t.Department) && matchesEmpDesig(t.Designation ?? t.Department, emp)),
 ];
 
 // Har employee × uska assigned template = 1 row (record ho ya na ho)
@@ -274,16 +328,18 @@ function buildAssignedView({ employees, approved, records }) {
   const recMap = new Map(records.map((r) => [`${r.EmployeeName}|||${r.TemplateId}`, r]));
   const rows = [];
   for (const emp of employees) {
-    const assigned = assignedTemplatesFor(approved, emp.department);
+    const assigned = assignedTemplatesFor(approved, emp);
     for (const t of assigned) {
       const rec = recMap.get(`${emp.name}|||${t.TemplateId}`);
       rows.push({
         EmployeeName: emp.name,
         Department: emp.department,
+        Designation: emp.designation,
         TemplateId: t.TemplateId,
         TemplateName: t.TemplateName,
-        TemplateDepartment: t.Department,
-        Type: isCommonDept(t.Department) ? "Common" : "Dept",
+        TemplateDepartment: t.Designation ?? t.Department, // compat alias
+        TemplateDesignation: t.Designation ?? t.Department, // naya key
+        Type: isCommonDesig(t.Designation ?? t.Department) ? "Common" : "Designation",
         DocumentScore: rec ? rec.DocumentScore : 0,
         VideoScore: rec ? rec.VideoScore : 0,
         QaScore: rec ? rec.QaScore : 0,
@@ -299,18 +355,31 @@ function buildAssignedView({ employees, approved, records }) {
   return rows;
 }
 
-// assigned rows se buckets: pending = assigned − completed − inProgress (never-started included)
+// assigned rows se buckets — UNIQUE TRAINING-ID wise count (user request):
+// "All" case me ek hi Training ID multiple employees par multiply ho kar duplicate count nahi banegi —
+// EK ID = sirf EK count (duplicacy-free). Status per ID aggregate hota hai:
+//   Completed   = is ID ko SABHI assigned employees ne complete kiya
+//   In Progress = kisi ek ne start kiya (par abhi sab complete nahi)
+//   Pending     = kisi ne bhi start nahi kiya
+// Score (totalEarned/totalMax) row-based hi rehta hai (score employee×template pair par banta hai).
+// NOTE: single-employee case (doer /my, admin employee filter) me unique-ID count = row count (koi change nahi).
 function summarizeAssigned(rows) {
   const mk = (arr) => {
-    const assigned = arr.length;
-    const completed = arr.filter((r) => r.Status === "Completed").length;
-    const inProgress = arr.filter((r) => r.Status === "In Progress").length;
+    const byTpl = new Map();
+    for (const r of arr) {
+      if (!byTpl.has(r.TemplateId)) byTpl.set(r.TemplateId, []);
+      byTpl.get(r.TemplateId).push(r);
+    }
+    const groups = [...byTpl.values()];
+    const assigned = groups.length; // UNIQUE training IDs — duplicacy nahi
+    const completed = groups.filter((rs) => rs.every((r) => r.Status === "Completed")).length;
+    const inProgress = groups.filter((rs) => rs.every((r) => r.Status !== "Completed") && rs.some((r) => r.Started || r.Status === "In Progress")).length;
     const pending = Math.max(0, assigned - completed - inProgress);
+    const started = groups.filter((rs) => rs.some((r) => r.Started)).length;
     const totalEarned = arr.reduce((s, r) => s + parseNum(r.TotalScore), 0);
     return {
-      assigned, started: arr.filter((r) => r.Started).length,
-      completed, inProgress, pending,
-      totalMax: assigned * 300, totalEarned,
+      assigned, started, completed, inProgress, pending,
+      totalMax: arr.length * 300, totalEarned,
     };
   };
   const common = mk(rows.filter((r) => r.Type === "Common"));
@@ -327,57 +396,72 @@ function summarizeAssigned(rows) {
   return { common, dept, total };
 }
 
-// scope filter: "all" | "common" | <template dept name>
+// scope filter: "all" | "common" | <template designation name>
 function applyScope(rows, scope) {
   if (!scope || scope === "all") return rows;
   if (String(scope).toLowerCase() === "common") return rows.filter((r) => r.Type === "Common");
-  return rows.filter((r) => r.Type !== "Common" && sameDept(r.TemplateDepartment, scope));
+  return rows.filter((r) => r.Type !== "Common" && sameDesig(r.TemplateDesignation ?? r.TemplateDepartment, scope));
 }
 
 // ============================================================
 // GET ROUTES
 // ============================================================
 
-// All templates grouped (admin) - optional ?department= & ?approval= filter
+// All templates grouped (admin) - optional ?designation= (naya) / ?department= (purana compat) & ?approval= filter
 router.get("/templates", auth, asyncHandler(async (req, res) => {
-  const { department, approval } = req.query;
+  const { department, designation, approval } = req.query;
+  const desigFilter = designation || department;
   const rows = await readMasterRows();
   const qaRows = await readQaRows();
   let templates = groupTemplates(rows);
-  if (department && department !== "all") templates = templates.filter((t) => t.Department === department);
+  if (desigFilter && desigFilter !== "all") templates = templates.filter((t) => sameDept(t.Designation || t.Department, desigFilter));
   if (approval && approval !== "all") templates = templates.filter((t) => t.Approval === approval);
   for (const t of templates) t.QuestionCount = qaRows.filter((q) => q[0] === t.TemplateId).length;
   res.json({ ok: true, templates, total: templates.length });
 }));
 
-// Approved templates - available for DOER panel
+// Approved templates - DOER panel: match DESIGNATION se (Common + user ki designation)
+// ?designation= (naya) ya ?department= (purana, ab usme designation value aati hai) — case-insensitive
 router.get("/templates/approved", auth, asyncHandler(async (req, res) => {
   const rows = await readMasterRows();
   const qaRows = await readQaRows();
   let templates = groupTemplates(rows).filter((t) => t.Approval === "Approved");
-  
-  // Filter by department if provided (for DOER panel: Common + user's department)
-  const { department } = req.query;
-  if (department && department !== "all") {
-    templates = templates.filter(t => t.Department === "Common" || t.Department === department);
+
+  const { department, designation } = req.query;
+  const desigFilter = designation || department;
+  if (desigFilter && desigFilter !== "all") {
+    templates = templates.filter(t => isCommonDept(t.Designation || t.Department) || sameDept(t.Designation || t.Department, desigFilter));
   }
-  
-  // Sort: Common templates first, then department templates
+
+  // Sort: Common templates first, then designation templates
   templates.sort((a, b) => {
-    if (a.Department === "Common" && b.Department !== "Common") return -1;
-    if (a.Department !== "Common" && b.Department === "Common") return 1;
+    const ad = a.Designation || a.Department, bd = b.Designation || b.Department;
+    if (isCommonDept(ad) && !isCommonDept(bd)) return -1;
+    if (!isCommonDept(ad) && isCommonDept(bd)) return 1;
     return 0;
   });
-  
-  for (const t of templates) t.QuestionCount = qaRows.filter((q) => q[0] === t.TemplateId).length;
+
+  for (const t of templates) {
+    t.QuestionCount = qaRows.filter((q) => q[0] === t.TemplateId).length;
+    // Doer panel me designation naam se dikhe (compat ke liye Department bhi same value)
+    t.Designation = t.Designation || t.Department;
+    t.Department = t.Designation;
+  }
   res.json({ ok: true, templates, total: templates.length });
 }));
 
-// Unique departments present in MasterTemplateData
+// Unique designations present in MasterTemplateData (+ COMMON)
 router.get("/templates/departments", auth, asyncHandler(async (req, res) => {
   const rows = await readMasterRows();
   const depts = [...new Set(rows.map((r) => (r[1] || "").trim()).filter(Boolean))].sort();
-  res.json({ ok: true, departments: depts });
+  res.json({ ok: true, departments: depts, designations: depts });
+}));
+
+// Alias: /templates/designations (naya naam)
+router.get("/templates/designations", auth, asyncHandler(async (req, res) => {
+  const rows = await readMasterRows();
+  const list = [...new Set(rows.map((r) => (r[1] || "").trim()).filter(Boolean))].sort();
+  res.json({ ok: true, designations: list, departments: list });
 }));
 
 // Questions of a template. ?forTest=1 omits CorrectOption (for DOER test)
@@ -395,7 +479,7 @@ router.get("/qa/:templateId", auth, asyncHandler(async (req, res) => {
 // MASTER SOURCE = templates: har assigned (employee × template) row milti hai,
 // record na ho to Status="Pending", Started=false.
 // Query: ?employeeName= (name|all) & ?status= (all|Pending|In Progress|Completed)
-//        & ?scope= (all|common|<template-dept>) — Common/Dept filter
+//        & ?scope= (all|common|<template-designation>) — Common/Designation filter
 // Response: { records (assigned rows, filtered), summary (scoped assigned summary) }
 router.get("/records", auth, asyncHandler(async (req, res) => {
   const { employeeName, status, scope } = req.query;
@@ -415,13 +499,21 @@ router.get("/records", auth, asyncHandler(async (req, res) => {
 }));
 
 // DOER - meri assigned learnings (master source = templates).
-// Har assigned (common + mere dept) template ki row: record na ho → Pending/not-started.
+// Har assigned (COMMON + MERI DESIGNATION) template ki row: record na ho → Pending/not-started.
+// Match DESIGNATION se hota hai (department se nahi).
 // Response: { records: assigned rows, summary: {common, dept, total} }
 router.get("/my", auth, asyncHandler(async (req, res) => {
   const [masterRows, trainingRows] = await Promise.all([readMasterRows(), readTrainingRows()]);
   const approved = groupTemplates(masterRows).filter((t) => t.Approval === "Approved");
   const userDept = req.user.department || "";
-  const me = [{ name: req.user.name, department: userDept }];
+  // token me designation nahi hota — Employee sheet se designation nikalo
+  let userDesig = "";
+  try {
+    const masters = await readEmployeeMaster();
+    const meRow = masters.find((e) => e.name === req.user.name);
+    if (meRow) userDesig = meRow.designation || "";
+  } catch (e) { /* fallback: dept only */ }
+  const me = [{ name: req.user.name, department: userDept, designation: userDesig }];
   const assigned = buildAssignedView({ employees: me, approved, records: trainingRows.map(mapTrainingRow) });
   const summary = summarizeAssigned(assigned);
   const byId = new Map(assigned.map((r) => [r.TemplateId, r]));
@@ -437,9 +529,11 @@ router.get("/my", auth, asyncHandler(async (req, res) => {
 // ============================================================
 
 // ADMIN - Create new template (with indices + questions)
+// Body me designation (naya) ya department (purana compat) — column B me designation save hota hai
 router.post("/templates", auth, asyncHandler(async (req, res) => {
-  const { department, name, templateScore, indices, questions } = req.body;
-  if (!department || !name) return res.status(400).json({ error: "Department and Template Name are required" });
+  const { department, designation, name, templateScore, indices, questions } = req.body;
+  const desigVal = (designation || department || "").trim();
+  if (!desigVal || !name) return res.status(400).json({ error: "Designation and Template Name are required" });
   if (!indices || !indices.length) return res.status(400).json({ error: "At least one Index is required" });
 
   await ensureHeaders();
@@ -457,7 +551,7 @@ router.post("/templates", auth, asyncHandler(async (req, res) => {
       requestBody: {
         values: [[
           templateId,
-          department,
+          desigVal,
           (idx.name || "").trim() || `Index ${i + 1}`,
           idx.document || "",
           idx.video || "",
@@ -506,7 +600,7 @@ router.post("/indices", auth, asyncHandler(async (req, res) => {
     requestBody: {
       values: [[
         templateId,
-        template.Department,
+        template.Designation ?? template.Department,
         name.trim(),
         document || "",
         video || "",
@@ -552,9 +646,19 @@ router.post("/start", auth, asyncHandler(async (req, res) => {
     return res.json({ ok: true, record: mapTrainingRow(trainingRows[existingIdx]), alreadyStarted: true });
   }
 
+  // DOER - Start training: record me DESIGNATION save hoti hai (department nahi — designation-wise training)
+  // Purane token me designation na ho / blank ho to Employee sheet se designation nikalo.
+  let empDesig = String(req.user.designation || "").trim();
+  if (!empDesig) {
+    try {
+      const masters = await readEmployeeMaster();
+      const meRow = masters.find((e) => e.name === req.user.name);
+      if (meRow && meRow.designation) empDesig = meRow.designation;
+    } catch (e) { /* fallback: department */ }
+  }
   const row = [
     req.user.name,
-    req.user.department || "",
+    empDesig || req.user.department || "",
     template.TemplateName,
     templateId,
     0, 0, 0, 0,
@@ -575,6 +679,100 @@ router.post("/start", auth, asyncHandler(async (req, res) => {
     requestBody: { values: [row] },
   });
   res.json({ ok: true, record: mapTrainingRow(row), alreadyStarted: false });
+}));
+
+// ============================================================
+// QA BULK + AI ROUTES (Admin: Create Template helpers)
+// ============================================================
+
+// BULK QA - ek saath kai questions add (bulk upload / AI generate ke baad save)
+// Body: { templateId, questions: [{question, optionA..D, correctOption}] }
+router.post("/qa/bulk", auth, asyncHandler(async (req, res) => {
+  const { templateId, questions } = req.body;
+  if (!templateId) return res.status(400).json({ error: "templateId is required" });
+  if (!Array.isArray(questions) || !questions.length)
+    return res.status(400).json({ error: "questions array is required" });
+  const clean = questions
+    .map((q) => ({
+      question: String(q.question || "").trim(),
+      optionA: String(q.optionA || "").trim(),
+      optionB: String(q.optionB || "").trim(),
+      optionC: String(q.optionC || "").trim(),
+      optionD: String(q.optionD || "").trim(),
+      correctOption: String(q.correctOption || "A").trim().toUpperCase(),
+    }))
+    .filter((q) => q.question && q.optionA && q.optionB && ["A", "B", "C", "D"].includes(q.correctOption));
+  if (!clean.length) return res.status(400).json({ error: "Koi valid question nahi mila (Question + A + B + Correct A/B/C/D chahiye)" });
+  await ensureHeaders();
+  const sheets = await getSheets();
+  const rows = clean.map((q) => [templateId, `QA-${nanoid(8).toUpperCase()}`, q.question, q.optionA, q.optionB, q.optionC, q.optionD, q.correctOption]);
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: spreadsheetId(),
+    range: `${QA_SHEET}!A:H`,
+    valueInputOption: "USER_ENTERED",
+    requestBody: { values: rows },
+  });
+  res.json({ ok: true, added: rows.length, message: `${rows.length} questions added` });
+}));
+
+// AI QA GENERATE - template ki designation + document/video links se draft Q/A banao
+// Body: { topic?, department?, designation?, count?, documents?[], videos?[] }
+// NOTE: yahan koi paid AI key nahi chahiye — links + topic se smart heuristic
+// draft banta hai jise admin edit/remove karke save karta hai.
+router.post("/qa/ai-generate", auth, asyncHandler(async (req, res) => {
+  const { topic, department, designation, count, documents, videos } = req.body || {};
+  const n = Math.max(1, Math.min(20, parseInt(count, 10) || 5));
+  const docs = Array.isArray(documents) ? documents.filter(Boolean) : [];
+  const vids = Array.isArray(videos) ? videos.filter(Boolean) : [];
+  const title = String(topic || designation || department || "Training").trim() || "Training";
+  const slug = (u) => {
+    try {
+      const p = String(u || "").split("?")[0].split("#")[0].split("/").filter(Boolean);
+      const last = p[p.length - 1] || "link";
+      return decodeURIComponent(last).replace(/[-_+]+/g, " ").slice(0, 60) || "link";
+    } catch (e) { return "link"; }
+  };
+  const sources = [...docs.map((d) => ({ kind: "Document", label: slug(d) })), ...vids.map((v) => ({ kind: "Video", label: slug(v) }))];
+  const bank = [
+    (s, i) => ({
+      question: `${title}: ${s.kind} "${s.label}" ka mukhya uddeshya kya hai? (Q${i + 1})`,
+      optionA: `${s.kind} me di gayi process ko step-by-step follow karna`,
+      optionB: `${s.kind} ko bina dekhe kaam shuru kar dena`,
+      optionC: `Sirf pehla page dekhna aur baaki skip karna`,
+      optionD: `${s.kind} ko kisi aur ko forward karke bhool jana`,
+      correctOption: "A",
+    }),
+    (s, i) => ({
+      question: `${title}: ${s.kind} dekhne/padhne ke baad pehla sahi kadam kya hoga? (Q${i + 1})`,
+      optionA: `Apne doer ke saath discuss karke practical me apply karna`,
+      optionB: `Kuch na karna aur next training ka wait karna`,
+      optionC: `Bina samjhe QA test de dena`,
+      optionD: `Document/video delete kar dena`,
+      correctOption: "A",
+    }),
+    (s, i) => ({
+      question: `${title}: safety/quality ke hisaab se "${s.label}" me sabse mahatvapurna baat kya hai? (Q${i + 1})`,
+      optionA: `Bataye gaye safety aur quality steps ka paalan karna`,
+      optionB: `Shortcut lena taaki kaam jaldi ho`,
+      optionC: `Safety steps ko optional samajhna`,
+      optionD: `Bina PPE ke kaam karna`,
+      correctOption: "A",
+    }),
+    (s, i) => ({
+      question: `${title}: agar "${s.label}" me koi step samajh na aaye to kya karna chahiye? (Q${i + 1})`,
+      optionA: `Apne doer/supervisor se poochhkar clear karna`,
+      optionB: `Andaza lagakar kaam kar lena`,
+      optionC: `Us step ko chhod dena`,
+      optionD: `Kisi ko bataye bina ruk jana`,
+      correctOption: "A",
+    }),
+  ];
+  const questions = [];
+  for (let i = 0; i < n; i++) {
+    const s = sources.length ? sources[i % sources.length] : { kind: "Training", label: title };
+    questions.push(bank[i % bank.length](s, i));
+  }
+  res.json({ ok: true, questions, total: questions.length, note: "AI draft — admin edit/remove karke Save kare" });
 }));
 
 // ============================================================
@@ -658,8 +856,8 @@ router.put("/qa/:qaId", auth, asyncHandler(async (req, res) => {
   res.json({ ok: true, message: "Question updated" });
 }));
 
-// ADMIN - assigned learning summary (Common + Dept) — same master source as /records.
-// Query: ?employeeName= & ?scope= (all|common|<template-dept>)
+// ADMIN - assigned learning summary (Common + Designation) — same master source as /records.
+// Query: ?employeeName= & ?scope= (all|common|<template-designation>)
 // (Purana ?department= param bhi scope ki tarah support hai.)
 router.get("/records/summary", auth, asyncHandler(async (req, res) => {
   const { employeeName, scope, department } = req.query;
@@ -680,12 +878,27 @@ router.get("/records/summary", auth, asyncHandler(async (req, res) => {
   const assigned = buildAssignedView({ employees: emps, approved, records: trainingRows.map(mapTrainingRow) });
   const scoped = applyScope(assigned, activeScope);
   const summary = summarizeAssigned(scoped);
+  // FIX: Common count missing tha — ab hamesha scoped summary ke andar
+  // common+dept dono counts bhejo taaki admin tab me sahi dikhe.
+  const commonRows = scoped.filter((r) => r.Type === "Common");
+  const deptRows = scoped.filter((r) => r.Type !== "Common");
   const templateCounts = {
     common: approved.filter((t) => isCommonDept(t.Department)).length,
     dept: approved.filter((t) => !isCommonDept(t.Department)).length,
     total: approved.length,
   };
-  res.json({ ok: true, summary: { ...summary, templateCounts, employeeCount: emps.length } });
+  res.json({
+    ok: true,
+    summary: {
+      ...summary,
+      templateCounts,
+      employeeCount: emps.length,
+      commonAssigned: commonRows.length,
+      deptAssigned: deptRows.length,
+      commonCompleted: commonRows.filter((r) => r.Status === "Completed").length,
+      deptCompleted: deptRows.filter((r) => r.Status === "Completed").length,
+    },
+  });
 }));
 
 // DOER - Update training progress (complete doc/video of an index, save tools, submit QA)
@@ -710,21 +923,15 @@ router.put("/progress", auth, asyncHandler(async (req, res) => {
   getViews(progress); // ensure views {doc:{},video:{}}
 
   // viewTick ONLY: sirf view count karo, save karke turant return (neeche scoring se pehle save hota hai)
+  // COOLDOWN HATA DIYA — instant counting (koi 429/wait nahi). lastAt sirf audit ke liye.
   if (viewTick && (viewTick.kind === "doc" || viewTick.kind === "video") && viewTick.index) {
     const k = viewTick.kind === "doc" ? "doc" : "video";
     const key = String(viewTick.index);
     const mode = viewTick.mode === "withDoer" ? "withDoer" : "self";
     const nowMs = Date.now();
     const slot = getViewSlot(progress, k, key);
-    const left = cooldownLeftMs(progress, k, key, nowMs);
-    if (left > 0) {
-      return res.status(429).json({
-        error: `You just counted a view. Please read/watch carefully — the next view button will enable after ${fmtCooldown(left)} (15-minute gap).`,
-        views: progress.views, cooldownMs: left,
-      });
-    }
     if (mode === "self" && slot.self >= REQUIRED_SELF_VIEWS)
-      return res.status(400).json({ error: `Self views complete (3/3). Now 2 views WITH your doer are required.`, views: progress.views });
+      return res.status(400).json({ error: `Self views complete (2/2). Now 2 views WITH your doer are required.`, views: progress.views });
     if (mode === "withDoer" && slot.withDoer >= REQUIRED_WITHDOER_VIEWS)
       return res.status(400).json({ error: `With-doer views complete (2/2).`, views: progress.views });
     slot[mode] = parseNum(slot[mode]) + 1;
@@ -778,7 +985,7 @@ router.put("/progress", auth, asyncHandler(async (req, res) => {
       return res.status(400).json({ error: `Pehle Index ${parseInt(d, 10) - 1} complete karein (Document + Video)` });
     if (!viewsComplete(progress, "doc", d)) {
       const c = viewCount(progress, "doc", d);
-      return res.status(400).json({ error: `Document needs 3 self reads + 2 with-doer reads (self ${c.self}/3, with doer ${c.withDoer}/2). Then Mark as Read works.`, views: progress.views });
+      return res.status(400).json({ error: `Document needs 2 self reads + 2 with-doer reads (self ${c.self}/2, with doer ${c.withDoer}/2). Then Mark as Read works.`, views: progress.views });
     }
     if (!progress.docs.includes(d)) progress.docs.push(d);
   }
@@ -792,7 +999,7 @@ router.put("/progress", auth, asyncHandler(async (req, res) => {
       return res.status(400).json({ error: `Pehle Index ${parseInt(v, 10) - 1} complete karein (Document + Video)` });
     if (!viewsComplete(progress, "video", v)) {
       const c = viewCount(progress, "video", v);
-      return res.status(400).json({ error: `Video needs 3 self views + 2 with-doer views (self ${c.self}/3, with doer ${c.withDoer}/2). Then Mark as Watched works.`, views: progress.views });
+      return res.status(400).json({ error: `Video needs 2 self views + 2 with-doer views (self ${c.self}/2, with doer ${c.withDoer}/2). Then Mark as Watched works.`, views: progress.views });
     }
     if (!progress.vids.includes(v)) progress.vids.push(v);
   }
