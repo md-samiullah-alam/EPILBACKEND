@@ -9,8 +9,11 @@ const { getSheets } = require("../googleSheetsClient");
 // ============================================================
 router.get("/em-sheet", auth, asyncHandler(async (req, res) => {
   try {
-    const SHEET_ID = "13DPEwyhtzByr1tXD0jLoXkojX5ZcTlNDak3qKBC7exg";
-    const SHEET_NAME = "EM SHEET WITH RITEH SIR";
+    const SHEET_ID = process.env.GOOGLE_SHEET_ID_EMSHEET;
+    if (!SHEET_ID) {
+      return res.status(500).json({ error: "GOOGLE_SHEET_ID_EMSHEET is not configured in .env" });
+    }
+    const SHEET_NAME = process.env.EM_SHEET_TAB_NAME || "EM SHEET WITH RITEH SIR";
     
     console.log("📊 Fetching EM Sheet data...");
 
